@@ -84,7 +84,7 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
-    implementation("com.baidu.lbsyun:BaiduMapSDK_Map:8.2.0")
-    // flutter_bmflocation 插件已包含 BaiduMapSDK_Location_All
-    implementation("com.baidu.lbsyun:BaiduMapSDK_Util:7.6.7")
+    // BaiduMapSDK_Map 由 flutter_baidu_mapapi_map 插件自带
+    // BaiduMapSDK_Location_All 由 flutter_bmflocation 插件自带
+    implementation("com.baidu.lbsyun:BaiduMapSDK_Util:8.2.0")
 }
