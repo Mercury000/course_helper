@@ -4,6 +4,7 @@ import '../../api/course.dart';
 import '../../models/active.dart';
 import 'list.dart';
 import 'settings.dart';
+import 'widget/active_card.dart';
 import '../../platform.dart';
 
 
@@ -37,7 +38,7 @@ class _CourseContentPageState extends State<CourseContentPage> {
     _loadCourseContent();
   }
 
-  Future<void> _loadCourseContent() async {
+  Future<void> _loadCourseContent({bool refresh = false}) async {
     setState(() {
       _isContentLoading = true;
     });
@@ -47,6 +48,8 @@ class _CourseContentPageState extends State<CourseContentPage> {
         widget.courseId,
         widget.classId,
         widget.cpi,
+        refreshSchedule: refresh,
+        courseName: widget.courseName,
       );
 
       if (contentList != null) {
@@ -112,62 +115,22 @@ class _CourseContentPageState extends State<CourseContentPage> {
         ),
       )
           : RefreshIndicator(
-        onRefresh: _loadCourseContent,
+        onRefresh: () => _loadCourseContent(refresh: true),
         child: ListView.builder(
           itemCount: _activeList.length,
           itemBuilder: (context, index) {
-            var active = _activeList[index];
-            return Card(
-              margin: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 8),
-              child: ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    active.getIcon(),
-                    color: active.status
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey,
-                    size: 35,
-                  ),
-                ),
-                title: Text(
-                  active.name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      active.description.isEmpty ?
-                      '手动结束' : active.description,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    Text(
-                      '参与人数：${active.attendNum}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey
-                      )
-                    )
-                  ],
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  CoursesPage.navigateToActive(context, active, widget.courseId, widget.classId, widget.cpi);
-                },
-              ),
+            final active = _activeList[index];
+            return ActiveCard(
+              active: active,
+              onTap: () {
+                CoursesPage.navigateToActive(
+                  context,
+                  active,
+                  widget.courseId,
+                  widget.classId,
+                  widget.cpi,
+                );
+              },
             );
           },
         ),

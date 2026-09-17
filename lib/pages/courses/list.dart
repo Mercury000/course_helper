@@ -5,6 +5,7 @@ import 'package:collection/collection.dart';
 
 import '../../platform.dart';
 import '../../api/course.dart';
+import '../../api/schedule.dart';
 import '../../api/api_service.dart';
 import '../../session/account.dart';
 import '../../models/course.dart';
@@ -18,6 +19,7 @@ import '../actives/evaluate.dart';
 import '../actives/vote.dart';
 import '../actives/questionnaire.dart';
 import 'content.dart';
+import 'unclassified.dart';
 import '../presentation.dart';
 
 
@@ -133,6 +135,11 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   List<dynamic> _lastOnLessonCourses = [];
   bool _isVisible = false;
 
+  /// 匹配不到课程条目的课表签到
+  List<Active> _unclassifiedScheduleActives = [];
+  final Map<String, int> _schedulePendingByCourse = {};
+  final Map<String, int> _scheduleSignedByCourse = {};
+
   void refreshCourses() {
     _loadCourses();
   }
@@ -148,7 +155,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
 
   /// 使用在线课堂数据更新课程列表
   void updateWithOnLessonCourses(List<Map<String, dynamic>>? onLessonCourses) {
-    _loadCourses(onLessonCourses);
+    _loadCourses(onLessonCourses: onLessonCourses);
   }
 
   @override
@@ -163,6 +170,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         AccountChangeNotifier().accountChanges.listen((_) {
           if (mounted) {
             _lastOnLessonCourses = [];
+            CXScheduleApi.clearCache();
             _loadCourses();
           }
           _startPeriodicRefresh();
@@ -190,7 +198,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         if (onLessonCourses != null && mounted) {
           if (!const DeepCollectionEquality().equals(_lastOnLessonCourses, onLessonCourses)) {
             _lastOnLessonCourses = onLessonCourses;
-            _loadCourses(onLessonCourses);
+            _loadCourses(onLessonCourses: onLessonCourses);
           }
         }
       } catch (e) {
@@ -199,7 +207,8 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _loadCourses([List<dynamic>? onLessonCourses]) async {
+  Future<void> _loadCourses(
+      {List<dynamic>? onLessonCourses, bool refreshSchedule = false}) async {
     setState(() {
       _isLoading = true;
     });
@@ -207,6 +216,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     if (!AccountManager.hasActiveSession()) {
       setState(() {
         _courses = [];
+        _clearScheduleState();
         _isLoading = false;
       });
       return;
@@ -236,7 +246,135 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         _courses = [];
         _isLoading = false;
       });
+      return;
     }
+
+    // 课表签到失败不能影响课程列表本身
+    try {
+      await _loadScheduleActives(refresh: refreshSchedule);
+    } catch (e) {
+      debugPrint('课表签到处理失败: $e');
+    }
+  }
+
+  /// 课表签到不阻塞课程列表渲染，失败时保持课程列表可用
+  Future<void> _loadScheduleActives({bool refresh = false}) async {
+    if (!PlatformManager().isChaoxing) {
+      if (mounted) setState(_clearScheduleState);
+      return;
+    }
+
+    final actives =
+        await CXScheduleApi().fetchWeekScheduleActives(refresh: refresh);
+    if (!mounted) return;
+
+    final unclassified = <Active>[];
+    final pending = <String, int>{};
+    final signed = <String, int>{};
+
+    for (final active in actives) {
+      final courseId = active.extras?['courseId']?.toString() ?? '';
+      final classId = active.extras?['classId']?.toString() ?? '';
+      final signName = active.extras?['courseName']?.toString() ?? '';
+
+      Course? matched;
+      for (final course in _courses) {
+        final byId = (courseId.isNotEmpty && course.courseId == courseId) ||
+            (classId.isNotEmpty && course.classId == classId);
+        // 教务课签到没有数字 ID，按课程名回退
+        final byName = signName.isNotEmpty &&
+            (course.name.contains(signName) || signName.contains(course.name));
+        if (byId || byName) {
+          matched = course;
+          break;
+        }
+      }
+
+      if (matched == null) {
+        unclassified.add(active);
+        continue;
+      }
+
+      final key = matched.courseId;
+      if (active.extras?['signed'] == true) {
+        signed[key] = (signed[key] ?? 0) + 1;
+      } else {
+        pending[key] = (pending[key] ?? 0) + 1;
+      }
+    }
+
+    debugPrint('课表签到：匹配课程 ${pending.length + signed.length} 门，未归类 ${unclassified.length} 条');
+
+    setState(() {
+      _unclassifiedScheduleActives = unclassified;
+      _schedulePendingByCourse
+        ..clear()
+        ..addAll(pending);
+      _scheduleSignedByCourse
+        ..clear()
+        ..addAll(signed);
+    });
+  }
+
+  void _clearScheduleState() {
+    _unclassifiedScheduleActives = [];
+    _schedulePendingByCourse.clear();
+    _scheduleSignedByCourse.clear();
+  }
+
+  Widget _buildUnclassifiedCard(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          child: Icon(
+            Icons.event_available,
+            color: Theme.of(context).colorScheme.onErrorContainer,
+          ),
+        ),
+        title: const Text(
+          '未归类签到',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          '${_unclassifiedScheduleActives.length} 条不在课程列表中的课表签到',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => UnclassifiedActivesPage(
+                actives: _unclassifiedScheduleActives,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSignBadge(BuildContext context, int pendingCount) {
+    final scheme = Theme.of(context).colorScheme;
+    final hasPending = pendingCount > 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: hasPending ? scheme.errorContainer : scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        hasPending ? '待签到 $pendingCount' : '已签到',
+        style: TextStyle(
+          fontSize: 12,
+          color:
+              hasPending ? scheme.onErrorContainer : scheme.onSecondaryContainer,
+        ),
+      ),
+    );
   }
 
   Future<void> handleScanContent(String result) async {
@@ -511,10 +649,10 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadCourses,
+        onRefresh: () => _loadCourses(refreshSchedule: true),
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : _courses.isEmpty
+            : (_courses.isEmpty && _unclassifiedScheduleActives.isEmpty)
             ? const Center(
                 child: Text(
                   '暂无课程数据',
@@ -522,9 +660,16 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                 ),
               )
             : ListView.builder(
-                itemCount: _courses.length,
+                itemCount: _courses.length +
+                    (_unclassifiedScheduleActives.isEmpty ? 0 : 1),
                 itemBuilder: (context, index) {
-                  var course = _courses[index];
+                  final hasUnclassified = _unclassifiedScheduleActives.isNotEmpty;
+                  if (hasUnclassified && index == 0) {
+                    return _buildUnclassifiedCard(context);
+                  }
+                  var course = _courses[index - (hasUnclassified ? 1 : 0)];
+                  final pendingCount = _schedulePendingByCourse[course.courseId] ?? 0;
+                  final signedCount = _scheduleSignedByCourse[course.courseId] ?? 0;
                   return Card(
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: InkWell(
@@ -602,6 +747,12 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                                               color: Colors.grey,
                                             ),
                                           ),
+                                          if (pendingCount > 0 || signedCount > 0)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 6),
+                                              child: _buildSignBadge(
+                                                  context, pendingCount),
+                                            ),
                                         ],
                                       ),
                                     ),

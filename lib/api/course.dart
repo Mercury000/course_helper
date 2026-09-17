@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 
 import 'api_service.dart';
+import 'schedule.dart';
 import '../utils/encrypt.dart';
 import '../models/active.dart';
 import '../models/course.dart';
+import '../platform.dart';
 
 class CXCourseApi extends Api {
   CXCourseApi([super.user]);
@@ -89,7 +91,8 @@ class CXCourseApi extends Api {
   }
 
   /// 获取合并处理后的活动列表
-  Future<List<Active>?> getActiveList(String courseId, String classId, String cpi) async {
+  Future<List<Active>?> getActiveList(String courseId, String classId, String cpi,
+      {bool refreshSchedule = false, String? courseName}) async {
     final joinClassTime = await getJoinClassTime(courseId, classId, cpi) ?? '';
       
     final results = await Future.wait([
@@ -139,7 +142,42 @@ class CXCourseApi extends Api {
       contentList.add(active);
     }
 
+    await _mergeScheduleActives(
+        contentList, courseId, classId, courseName, refreshSchedule);
+
     return contentList;
+  }
+
+  /// 合并课表签到：考勤应用按周次生成的签到不一定出现在活动列表接口里
+  Future<void> _mergeScheduleActives(List<Active> contentList, String courseId,
+      String classId, String? courseName, bool refresh) async {
+    if (!PlatformManager().isChaoxing || user == null) return;
+
+    final scheduleActives =
+        await CXScheduleApi(user).fetchWeekScheduleActives(refresh: refresh);
+    if (scheduleActives.isEmpty) return;
+
+    final existingIds = contentList.map((active) => active.id).toSet();
+    for (final active in scheduleActives) {
+      final extras = active.extras;
+      final signCourseId = extras?['courseId']?.toString() ?? '';
+      final signClassId = extras?['classId']?.toString() ?? '';
+
+      final matchesById = (signCourseId.isNotEmpty && signCourseId == courseId) ||
+          (signClassId.isNotEmpty && signClassId == classId);
+
+      // 教务课签到没有数字 ID，退化为课程名匹配：项目侧课程名常带学期后缀，
+      // 课表侧是其中一段，所以用包含判断
+      final signName = extras?['courseName']?.toString() ?? '';
+      final matchesByName = signName.isNotEmpty &&
+          courseName != null &&
+          (courseName.contains(signName) || signName.contains(courseName));
+
+      // 保留活动列表已有的条目，它带参与人数等更完整的信息
+      if ((matchesById || matchesByName) && existingIds.add(active.id)) {
+        contentList.add(active);
+      }
+    }
   }
 }
 
