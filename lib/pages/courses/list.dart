@@ -139,6 +139,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
   List<Active> _unclassifiedScheduleActives = [];
   final Map<String, int> _schedulePendingByCourse = {};
   final Map<String, int> _scheduleSignedByCourse = {};
+  final Map<String, int> _scheduleExpiredByCourse = {};
 
   void refreshCourses() {
     _loadCourses();
@@ -271,6 +272,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     final unclassified = <Active>[];
     final pending = <String, int>{};
     final signed = <String, int>{};
+    final expired = <String, int>{};
 
     for (final active in actives) {
       final courseId = active.extras?['courseId']?.toString() ?? '';
@@ -298,8 +300,10 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
       final key = matched.courseId;
       if (active.extras?['signed'] == true) {
         signed[key] = (signed[key] ?? 0) + 1;
-      } else {
+      } else if (active.status) {
         pending[key] = (pending[key] ?? 0) + 1;
+      } else {
+        expired[key] = (expired[key] ?? 0) + 1;
       }
     }
 
@@ -313,6 +317,9 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
       _scheduleSignedByCourse
         ..clear()
         ..addAll(signed);
+      _scheduleExpiredByCourse
+        ..clear()
+        ..addAll(expired);
     });
   }
 
@@ -320,6 +327,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     _unclassifiedScheduleActives = [];
     _schedulePendingByCourse.clear();
     _scheduleSignedByCourse.clear();
+    _scheduleExpiredByCourse.clear();
   }
 
   Widget _buildUnclassifiedCard(BuildContext context) {
@@ -356,22 +364,37 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildSignBadge(BuildContext context, int pendingCount) {
+  Widget _buildSignBadge(BuildContext context, int pendingCount, int expiredCount) {
     final scheme = Theme.of(context).colorScheme;
-    final hasPending = pendingCount > 0;
+
+    if (expiredCount > 0 && pendingCount == 0) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          '过期未签 $expiredCount',
+          style: TextStyle(
+            fontSize: 12,
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: hasPending ? scheme.errorContainer : scheme.secondaryContainer,
+        color: pendingCount > 0 ? scheme.errorContainer : scheme.secondaryContainer,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
-        hasPending ? '待签到 $pendingCount' : '已签到',
+        pendingCount > 0 ? '待签到 $pendingCount' : '已签到',
         style: TextStyle(
           fontSize: 12,
-          color:
-              hasPending ? scheme.onErrorContainer : scheme.onSecondaryContainer,
+          color: pendingCount > 0 ? scheme.onErrorContainer : scheme.onSecondaryContainer,
         ),
       ),
     );
@@ -670,6 +693,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                   var course = _courses[index - (hasUnclassified ? 1 : 0)];
                   final pendingCount = _schedulePendingByCourse[course.courseId] ?? 0;
                   final signedCount = _scheduleSignedByCourse[course.courseId] ?? 0;
+                  final expiredCount = _scheduleExpiredByCourse[course.courseId] ?? 0;
                   return Card(
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: InkWell(
@@ -747,11 +771,11 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                                               color: Colors.grey,
                                             ),
                                           ),
-                                          if (pendingCount > 0 || signedCount > 0)
+                                          if (pendingCount > 0 || signedCount > 0 || expiredCount > 0)
                                             Padding(
                                               padding: const EdgeInsets.only(top: 6),
                                               child: _buildSignBadge(
-                                                  context, pendingCount),
+                                                  context, pendingCount, expiredCount),
                                             ),
                                         ],
                                       ),
