@@ -17,6 +17,12 @@ if (keystorePropertiesFile.exists()) {
     println("key.properties not found. Please create it in the android directory.")
 }
 
+fun signingConfigValue(envName: String, propertyName: String): String? {
+    val envValue = System.getenv(envName)?.takeIf { it.isNotBlank() }
+    if (envValue != null) return envValue
+    return (keystoreProperties[propertyName] as? String)?.takeIf { it.isNotBlank() }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_11)
@@ -47,10 +53,22 @@ android {
 
     signingConfigs {
         create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = file(keystoreProperties["storeFile"] as String)
-            storePassword = keystoreProperties["storePassword"] as String
+            val releaseStorePassword = requireNotNull(
+                signingConfigValue("STORE_PASSWORD", "storePassword")
+            ) { "Missing signing value: STORE_PASSWORD/storePassword" }
+            val releaseKeyAlias = requireNotNull(
+                signingConfigValue("KEY_ALIAS", "keyAlias")
+            ) { "Missing signing value: KEY_ALIAS/keyAlias" }
+            val releaseKeyPassword = signingConfigValue("KEY_PASSWORD", "keyPassword")
+                ?.ifBlank { null } ?: releaseStorePassword
+            val releaseStoreFile = requireNotNull(
+                signingConfigValue("KEYSTORE_PATH", "storeFile")
+            ) { "Missing signing value: KEYSTORE_PATH/storeFile" }
+
+            keyAlias = releaseKeyAlias
+            keyPassword = releaseKeyPassword
+            storeFile = file(releaseStoreFile)
+            storePassword = releaseStorePassword
         }
     }
 

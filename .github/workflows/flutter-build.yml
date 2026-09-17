@@ -71,6 +71,11 @@ jobs:
 
       - name: Build Android APK (split-per-abi)
         if: matrix.platform == 'android'
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEYSTORE_PATH: ${{ github.workspace }}/android/anerycoft.jks
         run: flutter build apk --release --split-per-abi
 
       - name: Rename APKs
