@@ -55,12 +55,19 @@ jobs:
 
       - name: Setup Android signing (Android only)
         if: matrix.platform == 'android'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/anerycoft.jks
-          echo "storePassword=${{ secrets.STORE_PASSWORD }}" > android/key.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
-          echo "storeFile=../anerycoft.jks" >> android/key.properties
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > android/anerycoft.jks
+          {
+            printf 'storePassword=%s\n' "$STORE_PASSWORD"
+            printf 'keyPassword=%s\n' "${KEY_PASSWORD:-$STORE_PASSWORD}"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'storeFile=../anerycoft.jks\n'
+          } > android/key.properties
 
       - name: Build Android APK (split-per-abi)
         if: matrix.platform == 'android'
