@@ -676,7 +676,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : (_courses.isEmpty && _unclassifiedScheduleActives.isEmpty)
-            ? const Center(
+            ? Center(
                 child: Text(
                   PlatformManager().isRainClassroom ? '暂无正在上课的课程' : '暂无内容',
                   style: const TextStyle(fontSize: 18, color: Colors.grey),
