@@ -110,7 +110,7 @@ class _CourseContentPageState extends State<CourseContentPage> {
           : _activeList.isEmpty
           ? Center(
         child: Text(
-          PlatformManager().isRainClassroom ? '暂无正在上课的课程' : '暂无内容',
+          '暂无内容',
           style: const TextStyle(fontSize: 18, color: Colors.grey)
         ),
       )

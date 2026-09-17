@@ -678,8 +678,8 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
             : (_courses.isEmpty && _unclassifiedScheduleActives.isEmpty)
             ? const Center(
                 child: Text(
-                  '暂无课程数据',
-                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                  PlatformManager().isRainClassroom ? '暂无正在上课的课程' : '暂无内容',
+                  style: const TextStyle(fontSize: 18, color: Colors.grey),
                 ),
               )
             : ListView.builder(
