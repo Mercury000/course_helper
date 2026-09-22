@@ -1,4 +1,4 @@
-package com.anerycoft.coursehelper
+package com.mercury.coursehelper
 
 import android.app.Application
 import com.baidu.mapapi.CoordType

@@ -124,7 +124,7 @@ class _MainPageState extends State<MainPage> {
       final currentVersion = packageInfo.version;
 
       final dio = Dio();
-      final response = await dio.get('https://api.github.com/repos/AneryCoft/course_helper/releases/latest');
+      final response = await dio.get('https://api.github.com/repos/Mercury000/course_helper/releases/latest');
       final data = response.data;
       final latestVersion = data['tag_name']?.toString().replaceAll('v', '') ?? '';
 
@@ -132,7 +132,7 @@ class _MainPageState extends State<MainPage> {
         _showUpdateDialog(
           latestVersion: latestVersion,
           releaseNotes: data['body'] ?? '暂无更新说明',
-          downloadUrl: data['html_url'] ?? 'https://github.com/AneryCoft/course_helper/releases/latest',
+          downloadUrl: data['html_url'] ?? 'https://github.com/Mercury000/course_helper/releases/latest',
         );
       }
     } catch (e) {
