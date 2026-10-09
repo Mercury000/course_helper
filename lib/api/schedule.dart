@@ -305,6 +305,8 @@ class CXScheduleApi extends Api {
       final classId = query['classId'] ?? item['clazzid']?.toString() ?? '';
       final courseId = query['courseId'] ?? '';
       final lesson = lessonByClassId[classId];
+      final content =
+          _asMap(_tryDecodeJson(item['content'])) ?? const <String, dynamic>{};
 
       actives.add(_toActive(
         activeId: activeId,
@@ -321,6 +323,10 @@ class CXScheduleApi extends Api {
         startStr: item['starttimeStr']?.toString(),
         endStr: item['endtimeStr']?.toString(),
         signed: payload.signedIds.contains(activeId),
+        needFace: _asInt(content['openCheckFaceFlag']) == 1,
+        needPhoto: _asInt(item['ifphoto']) == 1,
+        locationRange: content['locationRange']?.toString(),
+        designatedPlace: content['locationText']?.toString(),
       ));
     }
 
@@ -351,6 +357,12 @@ class CXScheduleApi extends Api {
         startStr: item['startTime']?.toString(),
         endStr: item['endTime']?.toString(),
         signed: payload.signedIds.contains(activeId),
+        needFace: _asInt(content?['openCheckFaceFlag']) == 1,
+        // addressLocationRange 普通位置签到用，Ewm 为二维码签到的半径，取其一兜底
+        locationRange: (content?['addressLocationRange'] ??
+                content?['addressLocationRangeEwm'])
+            ?.toString(),
+        designatedPlace: content?['classroomAddress']?.toString(),
       ));
     }
 
@@ -369,6 +381,10 @@ class CXScheduleApi extends Api {
     required String? startStr,
     required String? endStr,
     required bool signed,
+    bool needFace = false,
+    bool needPhoto = false,
+    String? locationRange,
+    String? designatedPlace,
   }) {
     // 教务课签到没有数字 ID，用课程名兜底关联项目课程
     final courseName = lesson?['name']?.toString() ?? '';
@@ -398,6 +414,11 @@ class CXScheduleApi extends Api {
         'courseId': courseId,
         'classId': classId,
         'courseName': courseName,
+        // 签到详情已随列表拿到，签到页据此跳过不适用的 getPPTActiveInfo
+        'needFace': needFace,
+        'needPhoto': needPhoto,
+        'locationRange': locationRange,
+        'designatedPlace': designatedPlace,
       },
     );
   }

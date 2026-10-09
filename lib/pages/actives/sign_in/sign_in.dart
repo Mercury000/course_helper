@@ -199,6 +199,7 @@ class SignInPageState extends State<SignInPage> {
 
   // Getter
   bool get isGroupSign => widget.classId.isEmpty;
+  bool get isScheduleSign => widget.active.extras?['schedule'] == true;
   bool get needPhoto => _needPhoto;
   bool get needFace => _needFace;
   String? get designatedPlace => _designatedPlace;
@@ -277,6 +278,11 @@ class SignInPageState extends State<SignInPage> {
 
   Future<void> _parseSignInfo() async {
     try {
+      if (widget.active.extras?['schedule'] == true) { // 课表/考勤签到
+        _parseScheduleSignInfo();
+        return;
+      }
+
       if (isGroupSign) { // 群聊签到
         final groupSignDetail = await SignInApi.getGroupSignDetail(widget.active.id);
         if (groupSignDetail != null) {
@@ -359,6 +365,26 @@ class SignInPageState extends State<SignInPage> {
     }
   }
 
+  /// 课表/考勤签到：详情已随 getStudentSignByWeekAllSign 一并返回并存入 extras，
+  /// 这些 activeId 不在 getPPTActiveInfo 体系内，直接用 extras 填充，避免误报“获取活动信息失败”。
+  void _parseScheduleSignInfo() {
+    final extras = widget.active.extras ?? const {};
+    _needFace = extras['needFace'] == true;
+    _needPhoto = extras['needPhoto'] == true;
+    _locationRange = extras['locationRange'] as String?;
+    _designatedPlace = extras['designatedPlace'] as String?;
+
+    if (extras['signed'] == true) {
+      _status = 1;
+      setUserStatus(_currentUser!.uid, AccountStatus.completed);
+      _showSuccessMessage('当前用户已签到');
+      _selectedAccounts.removeWhere((user) => user.uid == _currentUser!.uid);
+    } else {
+      _status = 0;
+      setUserStatus(_currentUser!.uid, AccountStatus.incomplete);
+    }
+  }
+
   Future<void> _loadActivityData() async {
     setState(() {
       _isLoading = true;
@@ -374,7 +400,8 @@ class SignInPageState extends State<SignInPage> {
     });
 
     // 查询其他账号的签到状态（选择器挂载后执行）
-    if (!isGroupSign) {
+    // 课表/考勤签到无法按活动逐账号查状态，跳过以免误报“请求失败”
+    if (!isGroupSign && !isScheduleSign) {
       _checkOtherAccountsStatus();
     }
 
