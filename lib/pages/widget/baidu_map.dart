@@ -6,6 +6,8 @@ import 'package:flutter_baidu_mapapi_search/flutter_baidu_mapapi_search.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_bmflocation/flutter_bmflocation.dart';
 
+import '../../utils/logger.dart';
+
 class BaiduMapWidget extends StatefulWidget {
   final Function(BMFCoordinate)? onLocationSelected;
   final Function(BMFCoordinate, String)? onLocationSelectedWithAddress;
@@ -121,7 +123,7 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
         iosOptions.getMap(),
       );
     } catch (e) {
-      debugPrint('配置定位参数失败：$e');
+      logger.e('配置定位参数失败：$e');
     }
   }
 
@@ -188,7 +190,7 @@ class _BaiduMapWidgetState extends State<BaiduMapWidget> {
         }
       });
     } catch (e) {
-      debugPrint('定位失败：$e');
+      logger.e('定位失败：$e');
       if (!_isDisposed && mounted) {
         setState(() {
           _locationInfo = '定位失败：$e';

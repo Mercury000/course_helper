@@ -11,6 +11,7 @@ import '../../../api/quiz.dart';
 import '../../../api/image.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
+import '../../../utils/logger.dart';
 import '../widget/accounts_selector.dart';
 
 class QuizPage extends StatefulWidget {
@@ -208,10 +209,8 @@ class _QuizPageState extends State<QuizPage> {
 
   Future<void> _loadQuizDataFromHtml(String htmlContent) async {
     try {
-      // 提取 quizList 数据 - 使用更精确的正则表达式
-      // 匹配 quizList = 开头，直到 ]; 结尾（数组结束）
-      RegExp quizListRegex = RegExp(r'quizList\s*=\s*(\[.*?\]);', multiLine: true, dotAll: true);
-      RegExp activeRegex = RegExp(r'active\s*=\s*(\{.*?\});', multiLine: true, dotAll: true);
+      RegExp quizListRegex = RegExp(r'quizList = (\[.*\]);');
+      RegExp activeRegex = RegExp(r'active = (\{.*\});');
         
       Match? quizListMatch = quizListRegex.firstMatch(htmlContent);
       Match? activeMatch = activeRegex.firstMatch(htmlContent);
@@ -815,7 +814,7 @@ class _QuizPageState extends State<QuizPage> {
         }
       }
     } catch (e) {
-      debugPrint('提取图片URL失败: $e');
+      logger.e('提取图片URL失败: $e');
     }
     return urls;
   }

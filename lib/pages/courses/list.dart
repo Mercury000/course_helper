@@ -10,6 +10,7 @@ import '../../api/api_service.dart';
 import '../../session/account.dart';
 import '../../models/course.dart';
 import '../../models/active.dart';
+import '../../utils/logger.dart';
 import '../widget/scan.dart';
 import '../widget/avatar.dart';
 import '../actives/sign_in/sign_in.dart';
@@ -203,7 +204,7 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
           }
         }
       } catch (e) {
-        debugPrint('Periodic refresh error: $e');
+        logger.e('Periodic refresh error: $e');
       }
     });
   }

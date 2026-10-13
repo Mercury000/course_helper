@@ -115,7 +115,7 @@ class _PatternLockState extends State<PatternLock> {
     _activePointer = null;
     final result = List<int>.of(_selected);
     setState(() => _current = null);
-    if (result.isEmpty || widget.onInputComplete == null) {
+    if (result.length < 2 || widget.onInputComplete == null) {
       setState(() => _selected.clear());
       return;
     }

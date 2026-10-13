@@ -13,6 +13,7 @@ import '../api/api_service.dart';
 import '../models/presentation.dart';
 import '../session/account.dart';
 import '../platform.dart';
+import '../utils/logger.dart';
 
 @pragma('vm:entry-point')
 void _startForegroundCallback() {
@@ -228,7 +229,7 @@ class _PresentationPageState extends State<PresentationPage> {
         },
       );
     } catch (e) {
-      debugPrint('WebSocket 连接失败：$e');
+      logger.e('WebSocket 连接失败：$e');
     }
   }
 
@@ -264,7 +265,7 @@ class _PresentationPageState extends State<PresentationPage> {
       final data = jsonDecode(message);
       final op = data['op'];
 
-      debugPrint('WebSocket S2C：$message');
+      logger.d('WebSocket S2C：$message');
       
       final messageText = data['message'];
 
@@ -443,7 +444,7 @@ class _PresentationPageState extends State<PresentationPage> {
           break;
       }
     } catch (e) {
-      debugPrint('解析消息失败：$e');
+      logger.e('解析消息失败：$e');
     }
   }
 
@@ -536,7 +537,7 @@ class _PresentationPageState extends State<PresentationPage> {
         });
       }
     } catch (e) {
-      debugPrint('加载 PPT 失败：$e');
+      logger.e('加载 PPT 失败：$e');
       setState(() {
         _isLoading = false;
       });

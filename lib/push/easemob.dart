@@ -8,6 +8,7 @@ import '../main.dart';
 import '../pages/courses/list.dart';
 import '../models/active.dart';
 import '../platform.dart';
+import '../utils/logger.dart';
 
 /// 环信即时通讯
 class EasemobIM {
@@ -68,11 +69,11 @@ class EasemobIM {
         ConnectionEventHandler(
           onConnected: () {
             _isLoggedIn = true;
-            debugPrint('已连接到环信服务器');
+            logger.i('已连接到环信服务器');
             _onConnectionChanged?.call(true);
           },
           onDisconnected: () {
-            debugPrint('断开连接');
+            logger.i('断开连接');
             _onConnectionChanged?.call(false);
           },
           // 用户从其他设备登录
@@ -88,7 +89,7 @@ class EasemobIM {
         'easemob_msg_handler',
         ChatEventHandler(
           onMessagesReceived: (List<ChatMessage> messages) {
-            debugPrint('收到 ${messages.length} 条新消息');
+            logger.i('收到 ${messages.length} 条新消息');
             for (var message in messages) {
               onMessageReceived?.call(message);
               _handleMessage(message);
@@ -99,7 +100,7 @@ class EasemobIM {
 
       _isLoggedIn = await ChatClient.getInstance.isLoginBefore();
     } catch (e) {
-      debugPrint('初始化错误: $e');
+      logger.e('初始化错误: $e');
       rethrow;
     }
   }
@@ -115,7 +116,7 @@ class EasemobIM {
         await Permission.notification.request();
       }
     } catch (e) {
-      debugPrint('Easemob登录失败: $e');
+      logger.e('Easemob登录失败: $e');
       // code: 200 desc: The user is already logged in
       // code: 218 desc: Another user is already logged in
     }
@@ -132,7 +133,7 @@ class EasemobIM {
       _isLoggedIn = false;
       _onConnectionChanged?.call(false);
     } catch (e) {
-      debugPrint('Easemob退出失败: $e');
+      logger.e('Easemob退出失败: $e');
     }
   }
 
@@ -212,7 +213,7 @@ class EasemobIM {
       }
     }
 
-    debugPrint('消息: ${message.toJson()}');
+    logger.d('消息: ${message.toJson()}');
   }
 
 

@@ -1,8 +1,7 @@
-import 'package:flutter/foundation.dart';
-
 import 'api_service.dart';
 import 'schedule.dart';
 import '../utils/encrypt.dart';
+import '../utils/logger.dart';
 import '../models/active.dart';
 import '../models/course.dart';
 import '../platform.dart';
@@ -134,7 +133,7 @@ class CXCourseApi extends Api {
             try {
               active.signType = getSignTypeFromIndex(int.parse(otherId));
             } catch (e) {
-              debugPrint('解析 otherId 失败：$otherId, 错误：$e');
+              logger.e('解析 otherId 失败：$otherId, 错误：$e');
             }
           }
         }

@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
-import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
 import '../utils/encrypt.dart';
+import '../utils/logger.dart';
 import '../utils/storage.dart';
 import '../session/cookie.dart';
 import '../session/account.dart';
@@ -65,6 +64,57 @@ class HeadersManager {
   static Map<String, String> get chaoxingHeaders => Map.unmodifiable(_cxHeaders);
 
   static Map<String, String> get rainClassroomHeaders => Map.unmodifiable(_rcHeaders);
+}
+
+class DioLoggerInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    logger.i('→ ${options.method} ${options.uri}');
+    if (options.data != null) {
+      logger.d('请求体: ${_format(options.data)}');
+    }
+    if (options.queryParameters.isNotEmpty) {
+      logger.d('Query: ${options.queryParameters}');
+    }
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    final options = response.requestOptions;
+    logger.i('← ${response.statusCode} ${options.method} ${options.uri}');
+    final data = response.data;
+    // 跳过二进制
+    if (data != null && data is! List<int>) {
+      logger.d('响应体: ${_format(data)}');
+    }
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    logger.e(
+      '✗ ${err.response?.statusCode ?? '-'} ${err.requestOptions.method} '
+          '${err.requestOptions.uri}',
+      error: err,
+    );
+    final data = err.response?.data;
+    if (data != null && data is! List<int>) {
+      logger.d('错误响应体: ${_format(data)}');
+    }
+    handler.next(err);
+  }
+
+  static String _format(dynamic data) {
+    if (data is Map || data is List) {
+      try {
+        return const JsonEncoder.withIndent('  ').convert(data);
+      } catch (_) {
+        return data.toString();
+      }
+    }
+    return data.toString();
+  }
 }
 
 
@@ -135,22 +185,7 @@ class ApiService {
 
     _dio.interceptors.add(CookieInterceptor());
 
-    _dio.interceptors.add(PrettyDioLogger(
-        requestHeader: false,
-        requestBody: true,
-        responseBody: true,
-        responseHeader: false,
-        error: true,
-        compact: false,
-        maxWidth: 90,
-        enabled: kDebugMode,
-        filter: (options, args){
-          if(args.data.toString().contains('<html>')){
-            return false;
-          }
-          return !args.isResponse || !args.hasUint8ListData;
-        }
-    ));
+    _dio.interceptors.add(DioLoggerInterceptor());
   }
 
   /// 发送 HTTP 请求
@@ -206,7 +241,7 @@ class ApiService {
 
       return response;
     } catch (e, stackTrace) {
-      debugPrint('HTTP Exception [$url]: $e\n$stackTrace');
+      logger.e('HTTP Exception [$url]: $e\n$stackTrace');
     }
     return null;
   }
@@ -224,7 +259,7 @@ class ApiService {
       try {
         return await apiFunction(user);
       } catch (e) {
-        debugPrint('用户 ${user.name} 请求失败: $e');
+        logger.e('用户 ${user.name} 请求失败: $e');
         return null;
       }
     }).toList();
