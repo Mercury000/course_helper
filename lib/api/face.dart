@@ -63,8 +63,9 @@ class FaceApi extends Api {
     return null;
   }
 
-  /// 获取人脸加密参数
-  Future<String?> getFaceEnc(String activeId, String faceId) async {
+  /// 获取人脸校验结果，保留 enc 和 code。
+  Future<Map<String, String?>?> getFaceResult(
+      String activeId, String faceId) async {
     final url = 'https://mobilelearn.chaoxing.com/pptSign/check-face-result';
     final timeStampMS = DateTime.now().millisecondsSinceEpoch.toString();
     final faceResult = {
@@ -88,11 +89,20 @@ class FaceApi extends Api {
     if (response == null) return null;
 
     final data = response.data;
-    // {"status":1,"enc":""}
+    // {"status":1,"enc":"","code":""}
     if (data['status'] == 1) {
-      return data['enc'];
+      return {
+        'enc': data['enc']?.toString(),
+        'code': data['code']?.toString(),
+      };
     }
     return null;
+  }
+
+  /// 获取人脸加密参数
+  Future<String?> getFaceEnc(String activeId, String faceId) async {
+    final result = await getFaceResult(activeId, faceId);
+    return result?['enc'];
   }
 
   String getSignToken(Map<String, dynamic> map) {

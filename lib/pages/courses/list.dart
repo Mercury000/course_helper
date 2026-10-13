@@ -499,7 +499,8 @@ class _CoursesPageState extends State<CoursesPage> with WidgetsBindingObserver {
                     courseId: '',
                     classId: classId,
                     cpi: '',
-                    enc: enc
+                    enc: enc,
+                    groupSign: classId.isEmpty,
                   ),
                 ),
               );

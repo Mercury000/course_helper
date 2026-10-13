@@ -6,6 +6,7 @@ import 'dart:io';
 import '../../../../api/active.dart';
 import '../../../../api/api_service.dart';
 import '../../../../api/sign_in.dart';
+import '../../../../api/face.dart';
 import '../../../../setting/course_setting.dart';
 import '../../../models/user.dart';
 import '../../../models/active.dart';
@@ -94,21 +95,98 @@ abstract class SignStrategy {
 }
 
 class SignStrategyFactory {
-  static SignStrategy? create(SignType? type) {
+  static SignStrategy? create(
+    SignType? type, {
+    bool attendanceSign = false,
+  }) {
+    SignStrategy? strategy;
     switch (type) {
       case SignType.normal:
-        return NormalSign();
+        strategy = NormalSign();
+        break;
       case SignType.pattern:
-        return PatternSign();
+        strategy = PatternSign();
+        break;
       case SignType.code:
-        return CodeSign();
+        strategy = CodeSign();
+        break;
       case SignType.qrCode:
-        return QRCodeSign();
+        strategy = QRCodeSign();
+        break;
       case SignType.location:
-        return LocationSign();
+        strategy = LocationSign();
+        break;
       default:
         return null;
     }
+    return attendanceSign ? AttendanceSignStrategy(strategy) : strategy;
+  }
+}
+
+/// 保留原签到策略的 UI，仅将最终提交替换为考勤接口。
+class AttendanceSignStrategy implements SignStrategy {
+  final SignStrategy delegate;
+
+  AttendanceSignStrategy(this.delegate);
+
+  @override
+  Future<void> execute(
+    BuildContext context,
+    SignInPageState state,
+    SignParams params,
+  ) {
+    return delegate.execute(context, state, params);
+  }
+
+  @override
+  Future<String?> signForAccount(
+    User user,
+    SignParams params,
+    SignInPageState state,
+  ) async {
+    final userValidate = state.getUserCaptchaValidate(user.uid);
+    final validate = userValidate?['validate'];
+    final enc2 = userValidate?['enc2'];
+
+    String? faceId;
+    String? faceEnc;
+    String? faceCode;
+    if (state.needFace) {
+      final faceApi = FaceApi(user);
+      faceId = await faceApi.getFaceId();
+      if (faceId != null && faceId.isNotEmpty) {
+        final faceResult = await faceApi.getFaceResult(params.active.id, faceId);
+        faceEnc = faceResult?['enc'];
+        faceCode = faceResult?['code'];
+      }
+    }
+
+    String? signCode;
+    switch (params.active.signType) {
+      case SignType.pattern:
+        signCode = params.pattern;
+        break;
+      case SignType.code:
+        signCode = params.code;
+        break;
+      default:
+        break;
+    }
+
+    return SignInApi(user).attendanceSign(
+      params.active.id,
+      signCode: signCode,
+      studentTitle: params.getUserObjectId(user.uid),
+      address: params.address,
+      latitude: params.latitude,
+      longitude: params.longitude,
+      validate: validate,
+      enc: params.enc,
+      enc2: enc2,
+      faceId: faceId,
+      faceEnc: faceEnc,
+      faceCode: faceCode,
+    );
   }
 }
 
@@ -118,6 +196,7 @@ class SignInPage extends StatefulWidget {
   final String classId;
   final String cpi;
   final String? enc;
+  final bool groupSign;
 
   const SignInPage({
     super.key,
@@ -126,6 +205,7 @@ class SignInPage extends StatefulWidget {
     required this.classId,
     required this.cpi,
     this.enc,
+    this.groupSign = false,
   });
 
   @override
@@ -198,8 +278,19 @@ class SignInPageState extends State<SignInPage> {
   final Map<String, Map<String, String>> _userCaptchaValidate = {};
 
   // Getter
-  bool get isGroupSign => widget.classId.isEmpty;
+  bool get isGroupSign =>
+      widget.groupSign || (!isScheduleSign && widget.classId.isEmpty);
   bool get isScheduleSign => widget.active.extras?['schedule'] == true;
+  bool get usesAttendanceSign {
+    if (!isScheduleSign) return false;
+
+    final extras = widget.active.extras ?? const <String, dynamic>{};
+    final courseId = extras['courseId']?.toString() ?? '';
+    final classId = extras['classId']?.toString() ?? '';
+    final hasCourse = courseId.isNotEmpty && courseId != '0';
+    final hasClass = classId.isNotEmpty && classId != '0';
+    return !hasCourse || !hasClass;
+  }
   bool get needPhoto => _needPhoto;
   bool get needFace => _needFace;
   String? get designatedPlace => _designatedPlace;
@@ -394,7 +485,10 @@ class SignInPageState extends State<SignInPage> {
 
     await _parseSignInfo();
     
-    _currentStrategy = SignStrategyFactory.create(widget.active.signType);
+    _currentStrategy = SignStrategyFactory.create(
+      widget.active.signType,
+      attendanceSign: usesAttendanceSign,
+    );
     
     setState(() {
       _isLoading = false;

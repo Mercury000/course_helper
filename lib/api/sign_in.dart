@@ -196,6 +196,73 @@ class SignInApi extends Api {
     return response?.data;
   }
 
+  /// 课表/考勤签到专用提交接口
+  Future<String?> attendanceSign(
+    String activeId, {
+    String? signCode,
+    String? studentTitle,
+    String? address,
+    double? latitude,
+    double? longitude,
+    String? validate,
+    String? enc,
+    String? enc2,
+    String? faceId,
+    String? faceEnc,
+    String? faceCode,
+  }) async {
+    final data = <String, String>{
+      'activeId': activeId,
+      'signCode': signCode ?? '',
+      'longitude': longitude?.toStringAsFixed(6) ?? '',
+      'latitude': latitude?.toStringAsFixed(6) ?? '',
+      'address': address ?? '',
+      'locationResult': '',
+      'validate': validate ?? '',
+      'enc': enc ?? '',
+      'enc2': enc2 ?? '',
+      'studentTitle': studentTitle ?? '',
+      'currentFaceId': faceId ?? '',
+      'ifCFP': '1',
+      'faceEnc': faceEnc ?? '',
+      'faceCode': faceCode ?? '',
+      'sessionId': '',
+      'DB_STRATEGY': 'PRIMARY_KEY',
+      'STRATEGY_PARA': 'activeId',
+    };
+
+    if (address != null && latitude != null && longitude != null) {
+      final location = Location(
+        user: user,
+        address: address,
+        latitude: latitude,
+        longitude: longitude,
+      );
+      data['locationResult'] = location.toResultJson();
+    }
+
+    final body = data.entries
+        .map((entry) =>
+            '${Uri.encodeQueryComponent(entry.key)}=${Uri.encodeQueryComponent(entry.value)}')
+        .join('&');
+
+    final response = await ApiService.sendRequest(
+      'https://mobilelearn.chaoxing.com/widget/attendanceSign/student/signIn',
+      method: 'POST',
+      headers: {'content-type': 'application/x-www-form-urlencoded'},
+      body: body,
+      responseType: ResponseType.json,
+      userId: user?.uid,
+    );
+
+    final result = response?.data;
+    if (result is Map) {
+      if (result['result'] == 1) return 'success';
+      return (result['errorMsg'] ?? result['msg'] ?? '签到失败').toString();
+    }
+    return result?.toString();
+  }
+
   /// 获取签到详细
   // 经测试 所有签到可用
   static Future<Map<String, dynamic>?> getSignDetail(String activeId, [String? code]) async {
