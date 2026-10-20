@@ -196,6 +196,30 @@ class SignInApi extends Api {
     return response?.data;
   }
 
+  /// 考勤签到：签到前询问是否需要验证码（活动由 Referer 识别）
+  /// 返回 1 表示需要滑块验证码
+  Future<int?> checkIfValidate({String? referer}) async {
+    final headers = <String, String>{
+      'X-Requested-With': 'XMLHttpRequest',
+    };
+    if (referer != null && referer.isNotEmpty) {
+      headers['Referer'] = referer;
+    }
+
+    final response = await ApiService.sendRequest(
+      'https://mobilelearn.chaoxing.com/widget/attendanceSign/student/checkIfValidate',
+      params: const {'DB_STRATEGY': 'DEFAULT'},
+      headers: headers,
+      userId: user?.uid,
+    );
+
+    final result = response?.data;
+    if (result is Map && result['result'] != null) {
+      return int.tryParse(result['result'].toString());
+    }
+    return null;
+  }
+
   /// 课表/考勤签到专用提交接口
   Future<String?> attendanceSign(
     String activeId, {
@@ -210,6 +234,7 @@ class SignInApi extends Api {
     String? faceId,
     String? faceEnc,
     String? faceCode,
+    String? referer,
   }) async {
     final data = <String, String>{
       'activeId': activeId,
@@ -246,10 +271,19 @@ class SignInApi extends Api {
             '${Uri.encodeQueryComponent(entry.key)}=${Uri.encodeQueryComponent(entry.value)}')
         .join('&');
 
+    final headers = <String, String>{
+      'content-type': 'application/x-www-form-urlencoded',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Origin': 'https://mobilelearn.chaoxing.com',
+    };
+    if (referer != null && referer.isNotEmpty) {
+      headers['Referer'] = referer;
+    }
+
     final response = await ApiService.sendRequest(
       'https://mobilelearn.chaoxing.com/widget/attendanceSign/student/signIn',
       method: 'POST',
-      headers: {'content-type': 'application/x-www-form-urlencoded'},
+      headers: headers,
       body: body,
       responseType: ResponseType.json,
       userId: user?.uid,

@@ -187,6 +187,7 @@ class AttendanceSignStrategy implements SignStrategy {
       faceId: faceId,
       faceEnc: faceEnc,
       faceCode: faceCode,
+      referer: params.active.url,
     );
   }
 }
@@ -655,6 +656,31 @@ class SignInPageState extends State<SignInPage> {
           _showErrorMessage('验证码取消或失败');
           setUserStatus(user.uid, AccountStatus.error, message: '验证码取消或失败');
           return;
+        }
+      }
+      AccountManager.setCurrentSessionTemp(_currentUser!.uid);
+    }
+
+    // 考勤签到：按官方 H5 流程主动询问是否需要验证码
+    if (usesAttendanceSign) {
+      for (var user in _selectedAccounts) {
+        AccountManager.setCurrentSessionTemp(user.uid);
+
+        final needValidate = await SignInApi(user).checkIfValidate(referer: widget.active.url);
+        if (needValidate == 1) {
+          if (!await _handleCaptcha(user.uid)) {
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _isMultiSigning = false;
+              });
+            }
+            _showErrorMessage('验证码取消或失败');
+            setUserStatus(user.uid, AccountStatus.error, message: '验证码取消或失败');
+            return;
+          }
+        } else if (needValidate == 0) {
+          _userCaptchaValidate.remove(user.uid);
         }
       }
       AccountManager.setCurrentSessionTemp(_currentUser!.uid);
