@@ -633,78 +633,78 @@ class SignInPageState extends State<SignInPage> {
   Future<void> _performMultiSign() async {
     if (_selectedAccounts.isEmpty || _currentStrategy == null) return;
     if (_isMultiSigning) return;
-  
+
     setState(() {
       _isLoading = true;
       _isMultiSigning = true;
     });
 
-    final isQrCodeSign = widget.active.signType == SignType.qrCode;
+    final originalSessionId = AccountManager.currentSessionId;
+    try {
+      try {
+        final isQrCodeSign = widget.active.signType == SignType.qrCode;
 
-    // 除二维码签到以外 其他签到预先处理验证码
-    if (_needCaptcha && !isQrCodeSign) {
-      for (var user in _selectedAccounts) {
-        AccountManager.setCurrentSessionTemp(user.uid);
+        // 除二维码签到以外 其他签到预先处理验证码
+        if (_needCaptcha && !isQrCodeSign) {
+          for (var user in _selectedAccounts) {
+            AccountManager.setCurrentSessionTemp(user.uid);
 
-        if (!await _handleCaptcha(user.uid)) {
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-              _isMultiSigning = false;
-            });
-          }
-          _showErrorMessage('验证码取消或失败');
-          setUserStatus(user.uid, AccountStatus.error, message: '验证码取消或失败');
-          return;
-        }
-      }
-      AccountManager.setCurrentSessionTemp(_currentUser!.uid);
-    }
-
-    // 考勤签到：按官方 H5 流程主动询问是否需要验证码
-    if (usesAttendanceSign) {
-      for (var user in _selectedAccounts) {
-        AccountManager.setCurrentSessionTemp(user.uid);
-
-        final needValidate = await SignInApi(user).checkIfValidate(referer: widget.active.url);
-        if (needValidate == 1) {
-          if (!await _handleCaptcha(user.uid)) {
-            if (mounted) {
-              setState(() {
-                _isLoading = false;
-                _isMultiSigning = false;
-              });
+            if (!await _handleCaptcha(user.uid)) {
+              _showErrorMessage('验证码取消或失败');
+              setUserStatus(user.uid, AccountStatus.error, message: '验证码取消或失败');
+              return;
             }
-            _showErrorMessage('验证码取消或失败');
-            setUserStatus(user.uid, AccountStatus.error, message: '验证码取消或失败');
-            return;
           }
-        } else if (needValidate == 0) {
-          _userCaptchaValidate.remove(user.uid);
         }
-      }
-      AccountManager.setCurrentSessionTemp(_currentUser!.uid);
-    }
 
-    final results = await ApiService.sendForEachUser(
-      _selectedAccounts,
-      (user) async {
-        return await _currentStrategy!.signForAccount(user, _signParams, this);
+        // 考勤签到：按官方 H5 流程主动询问是否需要验证码
+        if (usesAttendanceSign) {
+          for (var user in _selectedAccounts) {
+            AccountManager.setCurrentSessionTemp(user.uid);
+
+            final needValidate = await SignInApi(user).checkIfValidate(referer: widget.active.url);
+            if (needValidate == null) {
+              const message = '验证码检查失败，请重试';
+              _showErrorMessage(message);
+              setUserStatus(user.uid, AccountStatus.error, message: message);
+              return;
+            }
+            if (needValidate == 1) {
+              if (!await _handleCaptcha(user.uid)) {
+                _showErrorMessage('验证码取消或失败');
+                setUserStatus(user.uid, AccountStatus.error, message: '验证码取消或失败');
+                return;
+              }
+            } else if (needValidate == 0) {
+              _userCaptchaValidate.remove(user.uid);
+            }
+          }
+        }
+      } finally {
+        // 提交前恢复原会话；检查失败、验证码取消或异常时也必须恢复。
+        AccountManager.setCurrentSessionTemp(originalSessionId);
       }
-    );
-    
-    // 统一处理所有签到结果
-    for (int i = 0; i < _selectedAccounts.length; i++) {
-      final user = _selectedAccounts[i];
-      final result = results[i];
-      await _handleSignResult(result, user);
-    }
-  
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _isMultiSigning = false;
-      });
+
+      final results = await ApiService.sendForEachUser(
+        _selectedAccounts,
+        (user) async {
+          return await _currentStrategy!.signForAccount(user, _signParams, this);
+        }
+      );
+
+      // 统一处理所有签到结果
+      for (int i = 0; i < _selectedAccounts.length; i++) {
+        final user = _selectedAccounts[i];
+        final result = results[i];
+        await _handleSignResult(result, user);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isMultiSigning = false;
+        });
+      }
     }
   }
 
