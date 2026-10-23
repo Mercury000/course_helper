@@ -288,6 +288,33 @@ class RCCourseApi extends Api {
     }
   }
 
+  /// 获取签到状态
+  Future<Map<String, dynamic>?> getCheckIn() async {
+    final url = '/api/v3/lesson/location-checkin/eligibility';
+    final headers = {'authorization': 'Bearer $bearerToken'};
+    final response = await ApiService.sendRequest(url, headers: headers, userId: user?.uid);
+    if (response == null) return null;
+
+    // {'needLocationSignIn': False, 'signed': True, 'mode': 'signed', 'checkInTime': 1789133627322, 'address': ''}
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>?> submitLocationCheckIn(String lessonId, double latitude, double longitude, String address) async {
+    final url = '/api/v3/lesson/location-checkin/submit';
+    final headers = {'authorization': 'Bearer $bearerToken'};
+    final jsonData = {
+      "lat": latitude,
+      "lng": longitude,
+      "lessonId": lessonId,
+      "source": 54,
+      "address": address
+    };
+    final response = await ApiService.sendRequest(url, method: 'POST', headers: headers, body: jsonData, userId: user?.uid);
+    if (response == null) return null;
+
+    return response.data;
+  }
+
   Future<Map<String, dynamic>?> getPresentation(String presentationId) async {
     final url = '/api/v3/lesson/presentation/fetch?presentation_id=$presentationId';
     if (bearerToken == null) {
